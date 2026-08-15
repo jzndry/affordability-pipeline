@@ -1,0 +1,19 @@
+name: afford
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - fastapi>=0.110.0
+  - uvicorn>=0.28.0
+  - pydantic>=2.6.0
+  - pydantic-settings>=2.2.0
+  - celery>=5.3.6
+  - redis-py>=5.0.3
+  - websockets>=12.0
+  - python-multipart>=0.0.9
+  - pytest>=8.1.0
+  - pytest-asyncio>=0.23.5
+  - httpx>=0.27.0
+  - ruff>=0.3.0
+  - mypy>=1.9.0
