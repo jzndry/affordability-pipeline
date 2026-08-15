@@ -22,5 +22,7 @@ htmlcov/
 # Interview, yes interview prep files
 interview-prep/
 
-
-
+# VS Code
+.vscode/
+*.code-workspace/
+.vscode
