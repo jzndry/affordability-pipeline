@@ -18,3 +18,9 @@ htmlcov/
 
 # Environment variables
 .env
+
+# Interview, yes interview prep files
+interview-prep/
+
+
+
