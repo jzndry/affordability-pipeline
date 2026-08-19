@@ -1,7 +1,7 @@
 # ADR 005: Asynchronous Task Queuing via Celery and Redis
 
 ## Status
-Under review
+Accepted
 
 ## Context
 Running categorisation and risk evaluations synchronously on the API thread degrades throughput and increases request latency. We need an asynchronous queuing architecture to achieve sub-50ms acknowledgment times.
