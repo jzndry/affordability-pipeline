@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "affordability-pipeline"
+version = "1.0.0"
+description = "Asynchronous Open Banking Affordability and Underwriting Engine"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# --- PYTEST CONFIGURATION ---
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+# --- RUFF (LINTER & FORMATTER) CONFIGURATION ---
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]  # Style, logic errors, imports, naming
+ignore = ["E501"]                   # Ignore line length breaches handled by formatter
+
+# --- MYPY (STATIC TYPE CHECKER) CONFIGURATION ---
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
