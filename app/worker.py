@@ -9,7 +9,7 @@ from app.core.models import BankStatementPayload
 celery_app = Celery(
     "underwriting_worker",
     broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    backend=settings.REDIS_URL, # Using Redis as both broker and backend for Celery tasks
 )
 
 celery_app.conf.update(
