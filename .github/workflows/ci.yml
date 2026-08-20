@@ -1,0 +1,52 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, feature/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality-and-test:
+    name: Lint, Type Check, and Test
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy pytest pytest-asyncio httpx fastapi "uvicorn[standard]" pydantic pydantic-settings celery "redis>=5.0.0" websockets python-multipart plaid-python
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .
+
+      - name: Run Mypy Static Type Analysis
+        run: |
+          mypy app/
+
+      - name: Execute Pytest Suite
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          python -m pytest -v
