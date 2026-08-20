@@ -4,28 +4,53 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environments
+# Virtual environments & Conda
 .venv/
 env/
 venv/
 ENV/
+.conda/
 
-# Testing & Coverage
+# Testing, static analysis & caches
 .pytest_cache/
 .coverage
 htmlcov/
+.ruff_cache/
+.mypy_cache/
 
-# Environment variables
+# Environment variables & secrets
 .env
+.env.*
+!.env.example
 
-# Interview, yes interview prep files
+# Local documentation & interview assets
 interview-prep/
 
-# VS Code
+# IDE & Editor configurations
 .vscode/
 *.code-workspace/
-.vscode
+.idea/
 
-# MacOS
+# Operating System artifacts
 .DS_Store
+Thumbs.db
+
+# Docker & Container state
+.docker/
+docker-compose.override.yml
