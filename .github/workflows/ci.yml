@@ -3,6 +3,10 @@ name: Continuous Integration
 on:
   push:
     branches: [ main, feature/* ]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'app/frontend/**'
   pull_request:
     branches: [ main ]
 
