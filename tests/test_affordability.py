@@ -1,7 +1,13 @@
 from datetime import date
 from decimal import Decimal
+
 from app.core.affordability import AffordabilityEngine
-from app.core.models import BankStatementPayload, Transaction, TransactionCategory, UnderwritingDecision
+from app.core.models import (
+    BankStatementPayload,
+    Transaction,
+    TransactionCategory,
+    UnderwritingDecision,
+)
 
 
 def test_prime_borrower_approved():

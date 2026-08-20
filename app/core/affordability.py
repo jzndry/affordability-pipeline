@@ -1,5 +1,6 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import List
+
 from app.core.models import (
     AffordabilityAssessment,
     BankStatementPayload,
@@ -7,9 +8,9 @@ from app.core.models import (
     UnderwritingDecision,
 )
 
-MAX_GAMBLING_RATIO = Decimal("0.10")       # >= 10% -> Auto Decline
+MAX_GAMBLING_RATIO = Decimal("0.10")  # >= 10% -> Auto Decline
 REFERRAL_GAMBLING_RATIO = Decimal("0.05")  # >= 5% -> Manual Referral
-MAX_DEBT_TO_INCOME_RATIO = Decimal("0.40") # >= 40% -> Auto Decline
+MAX_DEBT_TO_INCOME_RATIO = Decimal("0.40")  # >= 40% -> Auto Decline
 MIN_DISPOSABLE_INCOME = Decimal("150.00")  # Minimum £150 buffer required
 
 
@@ -68,7 +69,9 @@ class AffordabilityEngine:
         elif gambling_ratio >= REFERRAL_GAMBLING_RATIO:
             if decision != UnderwritingDecision.DECLINED:
                 decision = UnderwritingDecision.REFERRED
-            risk_flags.append(f"ELEVATED_GAMBLING_ACTIVITY ({(gambling_ratio * 100):.1f}% of income)")
+            risk_flags.append(
+                f"ELEVATED_GAMBLING_ACTIVITY ({(gambling_ratio * 100):.1f}% of income)"
+            )
 
         if debt_ratio >= MAX_DEBT_TO_INCOME_RATIO:
             decision = UnderwritingDecision.DECLINED

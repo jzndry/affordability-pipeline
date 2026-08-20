@@ -104,16 +104,12 @@ def execute_profiling_run(
         risk underwriting evaluation, and total execution time.
     """
     # Create isolated deep copies of the transaction records for this iteration
-    transactions_copy = [
-        transaction.model_copy() for transaction in base_statement.transactions
-    ]
+    transactions_copy = [transaction.model_copy() for transaction in base_statement.transactions]
 
     start_time_nanoseconds = time.perf_counter_ns()
 
     # Stage 1: Categorisation and regex sanitisation
-    categorised_transactions = TransactionCategoriser.process_statement(
-        transactions_copy
-    )
+    categorised_transactions = TransactionCategoriser.process_statement(transactions_copy)
     categorisation_end_nanoseconds = time.perf_counter_ns()
 
     # Stage 2: Financial risk and affordability evaluation
@@ -123,17 +119,13 @@ def execute_profiling_run(
     _ = AffordabilityEngine.evaluate(statement_for_evaluation)
     underwriting_end_nanoseconds = time.perf_counter_ns()
 
-    categorisation_time_ms = (
-        categorisation_end_nanoseconds - start_time_nanoseconds
-    ) / 1_000_000.0
+    categorisation_time_ms = (categorisation_end_nanoseconds - start_time_nanoseconds) / 1_000_000.0
 
     underwriting_time_ms = (
         underwriting_end_nanoseconds - categorisation_end_nanoseconds
     ) / 1_000_000.0
 
-    total_time_ms = (
-        underwriting_end_nanoseconds - start_time_nanoseconds
-    ) / 1_000_000.0
+    total_time_ms = (underwriting_end_nanoseconds - start_time_nanoseconds) / 1_000_000.0
 
     return {
         "categorisation_time_ms": categorisation_time_ms,
@@ -184,9 +176,7 @@ def run_benchmark_suite(
 
     total_transactions_processed = iteration_count * transactions_per_statement
     total_elapsed_seconds = sum(total_timings) / 1000.0
-    throughput_transactions_per_second = (
-        total_transactions_processed / total_elapsed_seconds
-    )
+    throughput_transactions_per_second = total_transactions_processed / total_elapsed_seconds
 
     # Display results
     print(f"Categorisation Latency (Mean) : {average_categorisation_ms:8.3f} ms")

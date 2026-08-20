@@ -1,7 +1,9 @@
 import json
 from typing import Any, Dict
-from celery import Celery
+
 import redis
+from celery import Celery
+
 from app.config import settings
 from app.core.affordability import AffordabilityEngine
 from app.core.categoriser import TransactionCategoriser
@@ -26,8 +28,8 @@ celery_app.conf.update(
 redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 
-@celery_app.task(name="tasks.process_affordability_assessment", bind=True)
-def process_affordability_assessment(self, payload_dict: Dict[str, Any]) -> Dict[str, Any]:
+@celery_app.task(name="tasks.process_affordability_assessment", bind=True) # type: ignore[untyped-decorator]
+def process_affordability_assessment(self, payload_dict: Dict[str, Any]) -> Dict[str, Any]: # type: ignore[no-untyped-def]
     """
     Background Task:
     1. Deserialises raw dictionary into a domain model.

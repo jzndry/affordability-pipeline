@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.api.v1.websockets import ws_manager
 from app.main import app
 

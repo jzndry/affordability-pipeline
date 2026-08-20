@@ -1,9 +1,10 @@
 from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PLAID_CLIENT_ID: Optional[str] = None # Typing added to remove error suggestion in IDE
+    PLAID_CLIENT_ID: Optional[str] = None  # Typing added to remove error suggestion in IDE
     PLAID_SECRET: Optional[str] = None
     PLAID_ENV: str = "sandbox"
     REDIS_URL: str = "redis://localhost:6379/0"

@@ -1,5 +1,6 @@
 import re
 from typing import Dict, List, Pattern
+
 from app.core.models import Transaction, TransactionCategory
 
 NOISE_PATTERNS: List[Pattern[str]] = [

@@ -1,4 +1,5 @@
 from typing import Any, Dict
+
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 
@@ -23,7 +24,7 @@ class IngestionResponse(BaseModel):
 
 
 @app.get("/health", tags=["Health"])
-async def health_check() -> dict:
+async def health_check() -> Dict[str, str]:
     """Basic health check endpoint."""
     return {"status": "healthy"}
 

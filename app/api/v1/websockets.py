@@ -1,5 +1,6 @@
 import json
-from typing import Dict, Set
+from typing import Dict, Set, Any
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter(prefix="/ws", tags=["WebSockets"])
@@ -26,7 +27,7 @@ class ConnectionManager:
             if not self.active_subscriptions[job_id]:
                 del self.active_subscriptions[job_id]
 
-    async def broadcast_to_job(self, job_id: str, message: dict) -> None:
+    async def broadcast_to_job(self, job_id: str, message: Dict[str, Any]) -> None:
         """Sends a JSON message to all clients subscribed to a specific job_id."""
         if job_id in self.active_subscriptions:
             payload = json.dumps(message)
@@ -55,11 +56,13 @@ async def websocket_underwriting_endpoint(websocket: WebSocket, job_id: str) -> 
     await ws_manager.connect(websocket, job_id)
     try:
         # Send initial confirmation message
-        await websocket.send_json({
-            "event": "SUBSCRIBED",
-            "job_id": job_id,
-            "message": f"Successfully subscribed to real-time updates for job {job_id}.",
-        })
+        await websocket.send_json(
+            {
+                "event": "SUBSCRIBED",
+                "job_id": job_id,
+                "message": f"Successfully subscribed to real-time updates for job {job_id}.",
+            }
+        )
 
         # Keep connection open waiting for disconnect or client heartbeats
         while True:

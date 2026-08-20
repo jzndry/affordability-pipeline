@@ -1,5 +1,6 @@
 import time
 from typing import Any, Dict, List, Optional
+
 import plaid
 from plaid.api import plaid_api
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
@@ -48,7 +49,7 @@ class PlaidAdapter:
         except Exception:
             pass
 
-        return access_token
+        return str(access_token)
 
     def fetch_raw_transactions(
         self, access_token: str, max_retries: int = 5, retry_delay: float = 1.5

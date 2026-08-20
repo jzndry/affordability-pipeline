@@ -1,10 +1,11 @@
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from app.adapters.plaid_adapter import PlaidAdapter
 
-
-
 # UNIT TEST (Fast, Mocked, Offline - Ideal for GitHub Actions CI)
+
 
 def test_plaid_pagination_loop():
     """
@@ -56,8 +57,8 @@ def test_plaid_pagination_loop():
         assert mock_client.transactions_sync.call_count == 2
 
 
-
 # INTEGRATION TEST (Live Plaid Sandbox API)
+
 
 def test_live_plaid_sandbox_integration(
     plaid_adapter: PlaidAdapter, has_valid_plaid_credentials: bool
@@ -75,7 +76,9 @@ def test_live_plaid_sandbox_integration(
     # 1. Generate sandbox access token
     access_token = plaid_adapter.generate_sandbox_access_token()
     assert access_token is not None
-    assert access_token.startswith("access-sandbox-"), "Token must be a valid Plaid sandbox access token"
+    assert access_token.startswith("access-sandbox-"), (
+        "Token must be a valid Plaid sandbox access token"
+    )
 
     # 2. Fetch transactions via cursor sync
     transactions = plaid_adapter.fetch_raw_transactions(access_token=access_token)

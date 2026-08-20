@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+
 from app.core.categoriser import TransactionCategoriser
 from app.core.models import Transaction, TransactionCategory
 

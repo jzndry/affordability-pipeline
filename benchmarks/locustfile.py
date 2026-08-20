@@ -11,7 +11,6 @@ from typing import Any, Dict, List
 
 from locust import HttpUser, between, task
 
-
 SAMPLE_DESCRIPTIONS: List[str] = [
     "BGC EMPLOYER SALARY DWP",
     "DIRECT DEBIT HOUSING RENT",
