@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+
+# Environment variables & secrets
+.env
+.env.*
+
+# Python caches and bytecode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test, linting, and type-check caches
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# IDE & Editor settings
+.vscode
+.idea
+*.code-workspace
+
+# Local non-runtime directories
+tests
+benchmarks
+interview-prep
+docs
+
+# OS-specific files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  # 1. In-Memory Task Broker & Pub/Sub Message Bus
+  redis:
+    image: redis:7-alpine
+    container_name: affordability_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - affordability_network
+
+  # 2. FastAPI ASGI Web Gateway
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: affordability_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./app:/app/app
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - affordability_network
+
+  # 3. Asynchronous Celery Underwriting Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: affordability_worker
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    volumes:
+      - ./app:/app/app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - affordability_network
+
+networks:
+  affordability_network:
+    driver: bridge
