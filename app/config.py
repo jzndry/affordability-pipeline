@@ -15,4 +15,3 @@ class Settings(BaseSettings):
 
 # Create a single reusable instance
 settings = Settings()
-    
