@@ -2,8 +2,6 @@
 
 A real-time financial pipeline that takes in bank statements, classifies every transaction, computes debt-to-income and risk metrics, and streams an underwriting decision (**APPROVED / REFERRED / DECLINED**) back to the client over a live WebSocket connection.
 
----
-
 ## The reason behind the project
 
 Lenders have to check whether a borrower can actually afford a loan. To do that properly you read their bank statements: how much comes in, how much goes out, and whether there are warning signs such as heavy gambling or too much existing debt. This project performs that check **automatically and in real time**.
