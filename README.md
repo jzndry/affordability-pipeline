@@ -46,9 +46,6 @@ The pattern of doing a fast, process in the background and then streaming the re
   │  gateway      │                                     on the client instantly
   └───────────────┘
 ```
-
-![System architecture](docs/afford-architecture.png)
-
 ---
 
 ## Each part of the codebase, in a horribly simplified manner
@@ -72,7 +69,8 @@ Before a statement is accepted, Pydantic validates its shape: an account holder,
 
 ### 3. Exact decimal money handling
 
-Computers are poor at decimals. `0.1 + 0.2` evaluates to `0.30000000000000004`. For money that is unacceptable. Every financial value in this project uses Python's `Decimal` type, so all totals are exact to the penny.Financial auditing rules expect this. *(See `docs/adr/002-decimal-financial-modelling.md`.)*
+Computers are poor at decimals. `0.1 + 0.2` evaluates to `0.30000000000000004`. For money that is unacceptable. Every financial value in this project uses Python's `Decimal` type, so all totals are exact to the penny.Financial auditing rules expect this. 
+*See [`docs/adr/002-decimal-financial-modelling.md`](docs/adr/002-decimal-financial-modelling.md)*
 
 ### 4. The categoriser; making sense of messy bank text (`app/core/categoriser.py`)
 
@@ -83,7 +81,7 @@ Real bank descriptions look like `POS 4829 14OCT26 BET365 UK`. This component:
 
 It is rule-based on purpose. No machine learning needed as it is set in stone. Every categorisation can
 therefore be explained and audited, and it runs in well under a millisecond.
-*(See `docs/adr/003-regex.md`.)*
+*See [`docs/adr/003-regex.md`](docs/adr/003-regex.md)*
 
 ### 5. The affordability engine; the credit decision maker (`app/core/affordability.py`)
 
@@ -97,24 +95,26 @@ Once transactions are categorised, they are summed into buckets (income, essenti
 | Money left over each month | < £150 | **REFERRED** |
 
 Every non-approval carries a plain-English **risk flag** (e.g. `HIGH_DEBT_TO_INCOME_RATIO (45.0%)`). The same statement always produces the same decision so it is fully deterministic, not a black box.
-*(See `docs/adr/004-engine-design.md`.)*
+*See [`docs/adr/004-engine-design.md`](docs/adr/004-engine-design.md)*
 
 ### 6. Celery + Redis; the background workforce (`app/worker.py`)
 
 - **Redis** is an in-memory data store used here as a **job queue**. The web server drops jobs into it.
 - **Celery** is the **worker** that pulls jobs off the queue and runs the scoring, entirely separately from the web server.
 
-Because scoring happens here, the web server itself never slows down which means it keeps accepting uploads at full speed while statements are processed in the background. *(See `docs/adr/005-redis-celery.md`.)*
+Because scoring happens here, the web server itself never slows down which means it keeps accepting uploads at full speed while statements are processed in the background. 
+*See [`docs/adr/005-redis-celery.md`](docs/adr/005-redis-celery.md)*
 
 ### 7. WebSockets + Redis Pub/Sub; the live results feed (`app/api/v1/websockets.py`)
 
 Normally a browser has to keep asking "finished yet?". A **WebSocket** is a connection that stays open, so the server can tell the browser the instant the result is ready.
 
-**Redis Pub/Sub** is the internal announcement channel: when the worker finishes a job it publishes a "done" message, and the WebSocket listening for that `job_id` forwards the result to the right client. *(See `docs/adr/006-real-time-decision-streaming.md`.)*
+**Redis Pub/Sub** is the internal announcement channel: when the worker finishes a job it publishes a "done" message, and the WebSocket listening for that `job_id` forwards the result to the right client. *See [`docs/adr/006-real-time-decision-streaming.md`](docs/adr/006-real-time-decision-streaming.md)*
 
 ### 8. Plaid adapter; connecting to (real) bank data (`app/adapters/plaid_adapter.py`)
 
-**Plaid** is a service that lets applications securely pull a user's bank transactions which is the same "Open Banking" mechanism budgeting apps use. This project includes a working connector to Plaid's **sandbox** (a test bank with synthetic data). It is disabled in the public demo, for now until I can add it safely (protected against malicious use). *(See `docs/adr/001-use-plaid-sync-api.md`.)*
+**Plaid** is a service that lets applications securely pull a user's bank transactions which is the same "Open Banking" mechanism budgeting apps use. This project includes a working connector to Plaid's **sandbox** (a test bank with synthetic data). It is disabled in the public demo, for now until I can add it safely (protected against malicious use). 
+*See [`docs/adr/001-use-plaid-sync-api.md`](docs/adr/001-use-plaid-sync-api.md)*
 
 ### 9. Rate limiting
 
