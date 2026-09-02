@@ -39,7 +39,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff mypy pytest pytest-asyncio httpx fastapi "uvicorn[standard]" pydantic pydantic-settings celery "redis>=5.0.0" websockets python-multipart plaid-python
+          pip install -e ".[dev]"
 
       - name: Run Ruff Linter
         run: |
