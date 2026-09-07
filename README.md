@@ -48,7 +48,7 @@ The pattern of doing a fast, process in the background and then streaming the re
 ```
 ---
 
-## Each part of the codebase, in a horribly simplified manner
+## Each part of the codebase, in a more simplified manner
 
 ### 1. FastAPI; the front door (`app/main.py`)
 
