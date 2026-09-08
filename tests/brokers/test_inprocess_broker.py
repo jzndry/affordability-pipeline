@@ -19,6 +19,10 @@ def _payload() -> BankStatementPayload:
     return BankStatementPayload.model_validate(APPROVE)
 
 
+async def _collect(stream):
+    return [e async for e in stream]
+
+
 async def test_full_sequence_streamed_to_a_live_subscriber():
     broker = InProcessBroker()
     job_id = await broker.submit(_payload())
@@ -95,3 +99,41 @@ async def test_status_reports_success_after_completion():
     status = await broker.status(job_id)
     assert status.status == "SUCCESS"
     assert status.result is not None and status.result["decision"] == "APPROVED"
+
+
+async def test_subscribe_terminates_when_job_ends_without_a_terminal_event(monkeypatch):
+    """A BaseException escaping _run sets `done` but emits nothing; the stream must still end."""
+
+    def hard_stop(payload, emit):
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr("app.brokers.inprocess.run_underwriting_pipeline", hard_stop)
+    broker = InProcessBroker()
+    job_id = await broker.submit(_payload())
+
+    events = await asyncio.wait_for(_collect(broker.subscribe(job_id)), timeout=2.0)
+
+    assert [e.event for e in events] == ["FAILED"]
+    assert events[-1].error == "job ended without a terminal event"
+    assert events[-1].job_id == job_id
+    assert events[-1].seq == 0
+
+
+async def test_late_subscriber_to_a_job_that_never_finished_also_terminates(monkeypatch):
+    """A subscriber arriving after a silent death replays partial events then a synthetic FAILED."""
+
+    def emit_then_die(payload, emit):
+        from app.brokers.events import PipelineEvent
+
+        emit(PipelineEvent(event="RECEIVED"))
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr("app.brokers.inprocess.run_underwriting_pipeline", emit_then_die)
+    broker = InProcessBroker()
+    job_id = await broker.submit(_payload())
+    await broker._channels[job_id].done.wait()
+
+    events = await asyncio.wait_for(_collect(broker.subscribe(job_id)), timeout=2.0)
+
+    assert [e.event for e in events] == ["RECEIVED", "FAILED"]
+    assert [e.seq for e in events] == [0, 1]

@@ -1,5 +1,5 @@
 import time
-from typing import Any, AsyncIterator
+from typing import Any, AsyncGenerator
 
 import redis.asyncio as aioredis
 
@@ -15,6 +15,10 @@ POLL_TIMEOUT_SECONDS = 0.5
 # hard-killed worker (SIGKILL / OOM / eviction) that never published FAILED
 # cannot pin the generator forever.
 SILENCE_RECONCILE_SECONDS = 60.0
+# Hard ceiling on a single subscription. Celery reports PENDING for an unknown
+# task id, indistinguishable from "queued", so a bogus job_id would otherwise
+# tail forever; this bounds every subscription's lifetime regardless.
+MAX_SUBSCRIBE_SECONDS = 300.0
 
 
 def _terminal_event_from_status(
@@ -33,7 +37,7 @@ class CeleryRedisBroker:
         task = process_affordability_assessment.delay(payload.model_dump(mode="json"))
         return str(task.id)
 
-    async def subscribe(self, job_id: str) -> AsyncIterator[PipelineEvent]:
+    async def subscribe(self, job_id: str) -> AsyncGenerator[PipelineEvent, None]:
         conn = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         pubsub = conn.pubsub()
         channel = f"underwriting_jobs:{job_id}"
@@ -52,8 +56,17 @@ class CeleryRedisBroker:
                 if event.is_terminal:
                     return
 
-            last_activity = time.monotonic()
+            started = time.monotonic()
+            last_activity = started
             while True:
+                if time.monotonic() - started >= MAX_SUBSCRIBE_SECONDS:
+                    yield PipelineEvent(
+                        event="FAILED",
+                        job_id=job_id,
+                        seq=max_seq + 1,
+                        error="subscription timed out",
+                    )
+                    return
                 message = await pubsub.get_message(
                     ignore_subscribe_messages=True, timeout=POLL_TIMEOUT_SECONDS
                 )

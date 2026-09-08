@@ -74,25 +74,47 @@ async def test_subscribe_tails_live_events_after_replay(redis_conn):
 
 async def test_subscribe_dedupes_by_seq(redis_conn):
     job_id = "job-dupe-1"
-    ev = [
-        PipelineEvent(event="RECEIVED", job_id=job_id, seq=0),
-        PipelineEvent(event="DECIDED", job_id=job_id, seq=1, data={}),
-    ]
-    await _seed(redis_conn, job_id, ev)
+    await _seed(
+        redis_conn, job_id, [PipelineEvent(event="RECEIVED", job_id=job_id, seq=0)]
+    )
     broker = CeleryRedisBroker()
 
     import asyncio
     import json
 
-    async def republish_seq1():
+    async def publish_dupe_then_decided():
         await asyncio.sleep(0.05)
-        await redis_conn.publish(
-            f"underwriting_jobs:{job_id}", json.dumps(ev[1].model_dump(mode="json"))
-        )
+        for e in [
+            PipelineEvent(event="RECEIVED", job_id=job_id, seq=0),  # duplicate of replay
+            PipelineEvent(event="DECIDED", job_id=job_id, seq=1, data={}),
+        ]:
+            await redis_conn.publish(
+                f"underwriting_jobs:{job_id}", json.dumps(e.model_dump(mode="json"))
+            )
 
-    asyncio.create_task(republish_seq1())
-    received = [e.seq async for e in broker.subscribe(job_id)]
-    assert received == [0, 1]
+    task = asyncio.create_task(publish_dupe_then_decided())
+    try:
+        received = [e.seq async for e in broker.subscribe(job_id)]
+    finally:
+        await task
+    assert received == [0, 1]  # the re-published seq=0 is suppressed
+
+
+async def test_subscribe_times_out_when_no_terminal_event(redis_conn, monkeypatch):
+    monkeypatch.setattr("app.brokers.celery_redis.MAX_SUBSCRIBE_SECONDS", 0.2)
+    monkeypatch.setattr("app.brokers.celery_redis.POLL_TIMEOUT_SECONDS", 0.05)
+    job_id = "job-never-finishes"
+    await _seed(
+        redis_conn, job_id, [PipelineEvent(event="RECEIVED", job_id=job_id, seq=0)]
+    )
+    broker = CeleryRedisBroker()
+
+    events = [e async for e in broker.subscribe(job_id)]
+
+    assert [e.event for e in events] == ["RECEIVED", "FAILED"]
+    assert events[-1].error == "subscription timed out"
+    assert events[-1].seq == 1
+    assert events[-1].is_terminal
 
 
 async def test_subscribe_reconciles_silent_worker_success(redis_conn, monkeypatch):

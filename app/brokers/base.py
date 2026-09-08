@@ -1,4 +1,4 @@
-from typing import Any, AsyncIterator, Literal, Protocol
+from typing import Any, AsyncGenerator, Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -20,6 +20,6 @@ class JobStatusResponse(BaseModel):
 class JobBroker(Protocol):
     async def submit(self, payload: BankStatementPayload) -> str: ...
 
-    def subscribe(self, job_id: str) -> AsyncIterator[PipelineEvent]: ...
+    def subscribe(self, job_id: str) -> AsyncGenerator[PipelineEvent, None]: ...
 
     async def status(self, job_id: str) -> JobStatusResponse: ...

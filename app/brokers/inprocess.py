@@ -1,7 +1,7 @@
 import asyncio
 import itertools
 from dataclasses import dataclass, field
-from typing import AsyncIterator
+from typing import AsyncGenerator
 from uuid import uuid4
 
 from app.brokers.base import CapacityError, JobStatusResponse
@@ -60,27 +60,71 @@ class InProcessBroker:
                 settings.EVENT_LOG_TTL_SECONDS, self._channels.pop, job_id, None
             )
 
-    async def subscribe(self, job_id: str) -> AsyncIterator[PipelineEvent]:
+    async def subscribe(self, job_id: str) -> AsyncGenerator[PipelineEvent, None]:
         channel = self._channels.get(job_id)
         if channel is None:
             return
         queue: "asyncio.Queue[PipelineEvent]" = asyncio.Queue()
         channel.subscribers.add(queue)
         seen: set[int] = set()
+        max_seq = -1
         try:
             for event in list(channel.events):
                 seen.add(event.seq)
+                max_seq = max(max_seq, event.seq)
                 yield event
                 if event.is_terminal:
                     return
-            while True:
-                event = await queue.get()
-                if event.seq in seen:
-                    continue
-                seen.add(event.seq)
-                yield event
-                if event.is_terminal:
+
+            # Live tail. Race the queue against the channel's done flag: if _run
+            # exits via a BaseException/CancelledError it sets `done` without ever
+            # emitting a terminal event, so an unconditional `await queue.get()`
+            # would block this subscriber forever and burn a connection slot.
+            done_task = asyncio.create_task(channel.done.wait())
+            try:
+                while True:
+                    get_task = asyncio.create_task(queue.get())
+                    try:
+                        await asyncio.wait(
+                            {get_task, done_task},
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                    except BaseException:
+                        get_task.cancel()
+                        raise
+
+                    # A real event from the queue always wins when both are ready.
+                    if get_task.done() and not get_task.cancelled():
+                        event = get_task.result()
+                        if event.seq in seen:
+                            continue
+                        seen.add(event.seq)
+                        max_seq = max(max_seq, event.seq)
+                        yield event
+                        if event.is_terminal:
+                            return
+                        continue
+
+                    # The job ended and the queue has nothing more: synthesize a
+                    # terminal event so the stream (and the WS slot) is released.
+                    get_task.cancel()
+                    try:
+                        await get_task
+                    except asyncio.CancelledError:
+                        pass
+                    yield PipelineEvent(
+                        event="FAILED",
+                        job_id=job_id,
+                        seq=max_seq + 1,
+                        error="job ended without a terminal event",
+                    )
                     return
+            finally:
+                done_task.cancel()
+                try:
+                    await done_task
+                except asyncio.CancelledError:
+                    pass
         finally:
             channel.subscribers.discard(queue)
 
