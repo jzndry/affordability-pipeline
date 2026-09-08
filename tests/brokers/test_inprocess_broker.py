@@ -51,6 +51,29 @@ async def test_capacity_error_when_at_limit(monkeypatch):
         await broker.submit(_payload())
 
 
+async def test_concurrent_submits_are_capped_at_the_limit(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "MAX_CONCURRENT_ASSESSMENTS", 5)
+    broker = InProcessBroker()
+
+    results = await asyncio.gather(
+        *(broker.submit(_payload()) for _ in range(8)),
+        return_exceptions=True,
+    )
+
+    admitted = [r for r in results if isinstance(r, str)]
+    rejected = [r for r in results if isinstance(r, CapacityError)]
+    assert len(admitted) == 5
+    assert len(rejected) == 3
+
+    # let the in-flight jobs drain so _active returns to zero
+    for job_id in admitted:
+        async for _ in broker.subscribe(job_id):
+            pass
+    assert broker._active == 0
+
+
 async def test_failed_event_emitted_on_pipeline_error(monkeypatch):
     broker = InProcessBroker()
 

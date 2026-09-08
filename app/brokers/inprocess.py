@@ -29,6 +29,9 @@ class InProcessBroker:
     async def submit(self, payload: BankStatementPayload) -> str:
         if self._active >= settings.MAX_CONCURRENT_ASSESSMENTS:
             raise CapacityError("assessment capacity reached")
+        # No await between the guard and this increment, so check-and-admit is
+        # atomic under the single-threaded event loop and the cap actually holds.
+        self._active += 1
         job_id = uuid4().hex
         channel = JobChannel()
         self._channels[job_id] = channel
@@ -38,7 +41,6 @@ class InProcessBroker:
     async def _run(self, job_id: str, payload: BankStatementPayload) -> None:
         channel = self._channels[job_id]
         seq: "itertools.count[int]" = itertools.count()
-        self._active += 1
 
         def emit(event: PipelineEvent) -> None:
             event.job_id = job_id
