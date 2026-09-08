@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,8 +11,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.api.v1.websockets import router as websockets_router
+from app.brokers import CapacityError, get_broker
+from app.brokers.base import JobBroker
 from app.core.models import BankStatementPayload
-from app.worker import celery_app, process_affordability_assessment
 
 # Initialise rate limiter keyed by client IP address
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
@@ -78,9 +79,10 @@ async def health_check() -> Dict[str, str]:
 async def ingest_statement(
     request: Request,
     payload: BankStatementPayload,
+    broker: JobBroker = Depends(get_broker),
 ) -> IngestionResponse:
     """
-    Accepts statement payloads, enforces rate/size guardrails, and enqueues to Celery.
+    Accepts statement payloads, enforces rate/size guardrails, and submits to the broker.
     Returns HTTP 202 Accepted with a job_id.
     """
     if len(payload.transactions) > MAX_TRANSACTIONS_LIMIT:
@@ -90,17 +92,19 @@ async def ingest_statement(
         )
 
     try:
-        task = process_affordability_assessment.delay(payload.model_dump(mode="json"))
-        return IngestionResponse(
-            message="Statement received and enqueued for underwriting assessment.",
-            job_id=task.id,
-            status="PENDING",
-        )
-    except Exception as e:
+        job_id = await broker.submit(payload)
+    except CapacityError:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to enqueue statement task: {str(e)}",
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="The demo is busy right now. Try again in a moment.",
+            headers={"Retry-After": "10"},
         )
+
+    return IngestionResponse(
+        message="Statement received and enqueued for underwriting assessment.",
+        job_id=job_id,
+        status="PENDING",
+    )
 
 
 @app.get(
@@ -108,13 +112,9 @@ async def ingest_statement(
     summary="Check Assessment Job Status",
     tags=["Statements"],
 )
-async def get_job_status(job_id: str) -> Dict[str, Any]:
-    """Polls Celery/Redis for job execution status and results."""
-    task_result = celery_app.AsyncResult(job_id)
-    if task_result.state == "PENDING":
-        return {"job_id": job_id, "status": "PENDING"}
-    elif task_result.state == "SUCCESS":
-        return {"job_id": job_id, "status": "SUCCESS", "result": task_result.result}
-    elif task_result.state == "FAILURE":
-        return {"job_id": job_id, "status": "FAILURE", "error": str(task_result.info)}
-    return {"job_id": job_id, "status": task_result.state}
+async def get_job_status(
+    job_id: str, broker: JobBroker = Depends(get_broker)
+) -> Dict[str, Any]:
+    """Reports job execution status and results from the configured broker."""
+    job_status = await broker.status(job_id)
+    return job_status.model_dump(mode="json")
