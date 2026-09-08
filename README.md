@@ -58,6 +58,8 @@ The web server. It exposes a small set of endpoints:
 | --- | --- |
 | `POST /api/v1/statements/ingest` | Accepts a statement, hands the work off, returns a `job_id`. Responds in milliseconds. |
 | `GET /api/v1/statements/jobs/{job_id}` | Polling fallback; "is this job finished yet?" |
+| `GET /api/v1/statements/samples` | Lists the built-in persona fixtures and their expected decision. |
+| `GET /api/v1/statements/samples/{id}` | Returns the full bank statement payload for one persona. |
 | `WS /api/v1/ws/underwriting/{job_id}` | Live results feed (see section 7). |
 | `GET /health` | Used by hosting platforms to check if the server is up. |
 
@@ -109,7 +111,22 @@ Because scoring happens here, the web server itself never slows down which means
 
 Normally a browser has to keep asking "finished yet?". A **WebSocket** is a connection that stays open, so the server can tell the browser the instant the result is ready.
 
-**Redis Pub/Sub** is the internal announcement channel: when the worker finishes a job it publishes a "done" message, and the WebSocket listening for that `job_id` forwards the result to the right client. *See [`docs/adr/006-real-time-decision-streaming.md`](docs/adr/006-real-time-decision-streaming.md)*
+**Redis Pub/Sub** is the internal announcement channel: as the worker moves through a job it publishes each stage, and the WebSocket listening for that `job_id` forwards them to the right client. Every stage is also written to a short-lived per-job replay log (`underwriting_events:{job_id}`, kept for 900 seconds), so a client that connects late still receives the full ordered sequence from the beginning. *See [`docs/adr/006-real-time-decision-streaming.md`](docs/adr/006-real-time-decision-streaming.md)*
+
+The stream uses a fixed vocabulary of event names: `RECEIVED`, `CATEGORISING`, `SCORING`, `DECIDED`, `FAILED` (plus a one-off `SUBSCRIBED` frame when the socket opens). This replaces the earlier single `ASSESSMENT_COMPLETED` event.
+
+### 7a. Two ways to run the pipeline
+
+The web layer talks to a single `JobBroker` interface; which implementation it gets is chosen by the `JOB_BROKER` environment variable.
+
+- **Distributed (`JOB_BROKER=celery`)** — the full stack. `docker compose up` starts the web gateway, a Celery worker, and Redis; jobs are queued through Redis and scored on the worker, with results streamed back over Redis Pub/Sub. This is the production-shaped setup.
+- **In-process (`JOB_BROKER=inprocess`)** — no Celery, no Redis. The pipeline runs on the web server's event loop with in-memory fan-out to WebSocket subscribers. The deployed demo uses this so it can run on a single free instance.
+
+Both modes expose exactly the same API, event stream, and behaviour.
+
+### 7b. The deployed demo
+
+The public demo runs the in-process mode on a single instance behind Cloudflare, which is the sole ingress and terminates TLS in front of the app.
 
 ### 8. Plaid adapter; connecting to (real) bank data (`app/adapters/plaid_adapter.py`)
 
