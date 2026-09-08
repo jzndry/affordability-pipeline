@@ -1,3 +1,4 @@
+import time
 from typing import Any, AsyncIterator
 
 import redis.asyncio as aioredis
@@ -8,7 +9,21 @@ from app.config import settings
 from app.core.models import BankStatementPayload
 from app.worker import celery_app, process_affordability_assessment
 
-_POLL_TIMEOUT = 0.5
+# Seconds to wait on each pub/sub poll before looping.
+POLL_TIMEOUT_SECONDS = 0.5
+# After this much pub/sub silence, reconcile the job against Celery so a
+# hard-killed worker (SIGKILL / OOM / eviction) that never published FAILED
+# cannot pin the generator forever.
+SILENCE_RECONCILE_SECONDS = 60.0
+
+
+def _terminal_event_from_status(
+    job_id: str, status: JobStatusResponse, seq: int
+) -> PipelineEvent:
+    """Synthesize a terminal PipelineEvent from a terminal Celery status."""
+    if status.status == "SUCCESS":
+        return PipelineEvent(event="DECIDED", job_id=job_id, seq=seq, data=status.result)
+    return PipelineEvent(event="FAILED", job_id=job_id, seq=seq, error=status.error)
 
 
 class CeleryRedisBroker:
@@ -23,6 +38,7 @@ class CeleryRedisBroker:
         pubsub = conn.pubsub()
         channel = f"underwriting_jobs:{job_id}"
         seen: set[int] = set()
+        max_seq = -1
         try:
             await pubsub.subscribe(channel)  # subscribe before replay to avoid a gap
 
@@ -31,20 +47,35 @@ class CeleryRedisBroker:
                 if event.seq in seen:
                     continue
                 seen.add(event.seq)
+                max_seq = max(max_seq, event.seq)
                 yield event
                 if event.is_terminal:
                     return
 
+            last_activity = time.monotonic()
             while True:
                 message = await pubsub.get_message(
-                    ignore_subscribe_messages=True, timeout=_POLL_TIMEOUT
+                    ignore_subscribe_messages=True, timeout=POLL_TIMEOUT_SECONDS
                 )
                 if message is None or message.get("type") != "message":
+                    if time.monotonic() - last_activity >= SILENCE_RECONCILE_SECONDS:
+                        last_activity = time.monotonic()
+                        reconciled = await self.status(job_id)
+                        if reconciled.status in ("SUCCESS", "FAILURE"):
+                            synthetic = _terminal_event_from_status(
+                                job_id, reconciled, max_seq + 1
+                            )
+                            if synthetic.seq not in seen:
+                                seen.add(synthetic.seq)
+                                yield synthetic
+                            return
                     continue
                 event = PipelineEvent.model_validate_json(message["data"])
+                last_activity = time.monotonic()
                 if event.seq in seen:
                     continue
                 seen.add(event.seq)
+                max_seq = max(max_seq, event.seq)
                 yield event
                 if event.is_terminal:
                     return
