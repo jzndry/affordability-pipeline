@@ -33,7 +33,9 @@ async def get_sample(persona_id: str) -> BankStatementPayload:
     try:
         return get_persona(persona_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail=f"Unknown persona '{persona_id}'.")
+        raise HTTPException(
+            status_code=404, detail=f"Unknown persona '{persona_id}'."
+        ) from None
 
 
 @router.post(
@@ -66,7 +68,7 @@ async def ingest_statement(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="The demo is busy right now. Try again in a moment.",
             headers={"Retry-After": "10"},
-        )
+        ) from None
 
     return IngestionResponse(
         message="Statement received and enqueued for underwriting assessment.",

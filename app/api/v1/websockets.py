@@ -1,3 +1,4 @@
+import contextlib
 import logging
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -27,9 +28,10 @@ async def websocket_underwriting_endpoint(
     await websocket.accept()
     _ws_connections += 1
     try:
-        await websocket.send_json({"event": "SUBSCRIBED", "job_id": job_id})
-        async for event in broker.subscribe(job_id):
-            await websocket.send_json(event.model_dump(mode="json"))
+        await websocket.send_json({"event": "SUBSCRIBED", "job_id": job_id, "seq": -1})
+        async with contextlib.aclosing(broker.subscribe(job_id)) as stream:
+            async for event in stream:
+                await websocket.send_json(event.model_dump(mode="json"))
     except WebSocketDisconnect:
         logger.info("client disconnected from job %s", job_id)
     except Exception:  # noqa: BLE001 - log and close, never propagate

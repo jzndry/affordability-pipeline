@@ -1,9 +1,52 @@
+from typing import AsyncIterator
+
 from fastapi.testclient import TestClient
 
+from app.brokers import get_broker
+from app.brokers.base import CapacityError
+from app.brokers.events import PipelineEvent
 from app.config import settings
 from app.main import app
 
 client = TestClient(app)
+
+_MINIMAL_PAYLOAD = {
+    "statement_id": "s1",
+    "account_holder": "A",
+    "account_number": "1",
+    "sort_code": "40-00-01",
+    "transactions": [
+        {
+            "id": "t1",
+            "date": "2026-08-01",
+            "raw_description": "EMPLOYER SALARY BGC",
+            "amount": "3000.00",
+        }
+    ],
+}
+
+
+class _AtCapacityBroker:
+    async def submit(self, payload) -> str:
+        raise CapacityError("assessment capacity reached")
+
+    async def subscribe(self, job_id: str) -> AsyncIterator[PipelineEvent]:  # pragma: no cover
+        if False:
+            yield None
+
+    async def status(self, job_id):  # pragma: no cover
+        raise NotImplementedError
+
+
+def test_ingest_returns_429_with_retry_after_when_broker_at_capacity():
+    app.dependency_overrides[get_broker] = lambda: _AtCapacityBroker()
+    try:
+        r = client.post("/api/v1/statements/ingest", json=_MINIMAL_PAYLOAD)
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 429
+    assert "Retry-After" in r.headers
+    assert r.headers["Retry-After"] == "10"
 
 
 def test_health_reports_mode(monkeypatch):
