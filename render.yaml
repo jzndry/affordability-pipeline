@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: affordability-pipeline
+    runtime: python
+    plan: free
+    buildCommand: >
+      curl -fsSL https://bun.sh/install | bash &&
+      export PATH="$HOME/.bun/bin:$PATH" &&
+      cd app/frontend && bun install && bun run build && cd ../.. &&
+      pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: JOB_BROKER
+        value: inprocess
+      - key: CORS_ALLOW_ORIGINS
+        value: ""
+      - key: PYTHON_VERSION
+        value: "3.11.9"

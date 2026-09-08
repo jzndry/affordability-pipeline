@@ -1,8 +1,8 @@
-import os
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -41,21 +41,35 @@ app.add_middleware(
 app.include_router(statements_router, prefix="/api/v1")
 app.include_router(websockets_router, prefix="/api/v1")
 
-# Mount Static Frontend Assets
-frontend_dir = os.path.join(os.path.dirname(__file__), "frontend")
-if os.path.exists(frontend_dir):
-    app.mount("/frontend", StaticFiles(directory=frontend_dir), name="frontend")
-
-
-@app.get("/", include_in_schema=False)
-async def serve_dashboard() -> FileResponse:
-    """Serves the real-time underwriter dashboard frontend."""
-    index_file = os.path.join(frontend_dir, "index.html")
-    return FileResponse(index_file)
-
 
 @app.get("/health", tags=["Health"])
 async def health_check() -> dict[str, str]:
     """Basic health check endpoint; reports the active job-processing mode."""
     mode = "lite" if settings.JOB_BROKER == "inprocess" else "distributed"
     return {"status": "healthy", "mode": mode}
+
+
+# --- Single-page-app serving -------------------------------------------------
+# Serve the built React frontend (app/frontend/dist/) with a client-side-routing
+# fallback. The catch-all below MUST stay the last route registered so it never
+# shadows /api/..., /health, or the docs routes.
+FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
+
+if (FRONTEND_DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+_RESERVED_PREFIXES = ("api/", "ws/")
+_RESERVED_EXACT = {"health", "docs", "openapi.json", "redoc"}
+
+
+@app.get("/{full_path:path}", include_in_schema=False, response_model=None)
+async def serve_spa(full_path: str) -> FileResponse | PlainTextResponse:
+    if full_path in _RESERVED_EXACT or full_path.startswith(_RESERVED_PREFIXES):
+        raise HTTPException(status_code=404, detail="Not found")
+    index = FRONTEND_DIST / "index.html"
+    if index.is_file():
+        return FileResponse(index)
+    return PlainTextResponse(
+        "Frontend not built. Run `bun run build` in app/frontend, or use the API at /docs.",
+        status_code=200,
+    )
