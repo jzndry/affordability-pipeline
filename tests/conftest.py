@@ -1,5 +1,6 @@
 import pytest
 
+import app.main  # noqa: F401  # load app.main (hence app.brokers) before app.core.pipeline
 from app.adapters.plaid_adapter import PlaidAdapter
 from app.config import settings
 
