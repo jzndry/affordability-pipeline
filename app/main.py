@@ -1,5 +1,4 @@
 import os
-from typing import Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +9,8 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.statements import router as statements_router
 from app.api.v1.websockets import router as websockets_router
+from app.config import settings
+from app.middleware import MaxBodySizeMiddleware
 from app.ratelimit import limiter
 
 app = FastAPI(
@@ -22,13 +23,18 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
-# Allow CORS for cross-origin frontend requests
+# Cap request body size before routing/validation. Added first so that, since
+# add_middleware prepends, CORSMiddleware ends up outermost (a 413 still gets CORS headers).
+app.add_middleware(MaxBodySizeMiddleware)
+
+# Allow CORS for the configured frontend origins only. Wildcard origins are incompatible
+# with credentialed requests, so we use an env-driven allowlist and disable credentials.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_allow_origins_list,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 # Mount the statement + WebSocket routers under /api/v1
@@ -49,6 +55,7 @@ async def serve_dashboard() -> FileResponse:
 
 
 @app.get("/health", tags=["Health"])
-async def health_check() -> Dict[str, str]:
-    """Basic health check endpoint."""
-    return {"status": "healthy"}
+async def health_check() -> dict[str, str]:
+    """Basic health check endpoint; reports the active job-processing mode."""
+    mode = "lite" if settings.JOB_BROKER == "inprocess" else "distributed"
+    return {"status": "healthy", "mode": mode}
