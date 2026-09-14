@@ -42,6 +42,9 @@ htmlcov/
 # Local documentation & interview assets
 interview-prep/
 
+# Superpowers brainstorming / visual companion sessions
+.superpowers/
+
 # IDE & Editor configurations
 .vscode/
 *.code-workspace/
