@@ -1,117 +1,51 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
-
 function App() {
-  const [count, setCount] = useState(0)
+
+  const statement = {
+  statement_id: "stmt_001",
+  account_holder: "Jane Doe",
+  account_number: "12345678",
+  sort_code: "40-00-01",
+  transactions: [
+    { id: "t1", date: "2026-09-01", raw_description: "EMPLOYER SALARY BGC", amount: "2800.00" },
+    { id: "t2", date: "2026-09-03", raw_description: "RENT PAYMENT TO LANDLORD", amount: "-950.00" },
+    { id: "t3", date: "2026-09-05", raw_description: "POS 4829 BET365 UK", amount: "-40.00" },
+  ],
+  };
+  
+  async function handleClick() {
+    const response = await fetch('http://localhost:8000/api/v1/statements/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(statement),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const { job_id } = await response.json();
+    console.log('job_id:', job_id);
+
+    const ws = new WebSocket(`ws://localhost:8000/api/v1/ws/underwriting/${job_id}`);
+    ws.onmessage = (event) => console.log('WS message:', JSON.parse(event.data));
+    ws.onerror = (err) => console.error('WS error:', err);
+    ws.onclose = () => console.log('WS closed');
+  }
+
+  
 
   return (
     <>
       <section id="center">
         <div className="hero">
           
-        </div>
-        <div>
-          <h1></h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
         <button
           type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+          onClick={handleClick}
         >
-          Count is {count}
+          Send POST Request
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
         </div>
       </section>
+ 
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
     </>
   )
 }
